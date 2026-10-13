@@ -37,12 +37,13 @@ Chỉnh `conf`, vùng cấm và N chỉ trên `normal/` + `event/`; chốt cấu
 
 ## 3. Dùng giao diện
 
-1. Tải video (hoặc chọn từ `data/`).
-2. Sửa bảng toạ độ vùng cấm (x%, y%); xem trước ngay trên khung hình đầu.
-3. Chọn đối tượng cần cảnh báo, N giây, ngưỡng confidence → **Chạy phân tích**.
-4. Xem video đã chú thích (xanh = bình thường, cam = trong vùng, đỏ = đã cảnh báo), bảng so sánh N, tab **Lịch sử cảnh báo** để tải CSV / báo cáo HTML.
-
-Điểm kiểm tra mặc định là **tâm bounding box** (đúng yêu cầu); có thể đổi sang **đáy bbox** (chân người) – thường đúng hơn với camera nghiêng.
+1. **Chọn video**: từ thư mục `data/` hoặc tải lên.
+2. **Kéo để đặt vùng cấm** ngay trên khung hình (dùng thanh trượt để xem khung hình khác):
+   - kéo **chấm tròn** để đổi hình dạng, kéo **bên trong vùng** để dời cả vùng;
+   - nhấp đúp lên **cạnh** để thêm điểm, nhấp đúp lên **chấm** để xoá (hoặc dùng nút ＋ / － / ↺);
+   - bấm **Lưu vùng này cho video** để ghi vào `data/zones.json`, `evaluate.py` sẽ dùng lại.
+3. Chỉnh nhanh ở thanh bên: đối tượng cần cảnh báo, số giây chờ, độ nhạy (mục nâng cao: mô hình, tốc độ, điểm kiểm tra).
+4. Bấm **Chạy phân tích** → xem video chú thích (xanh = bình thường, cam = trong vùng, đỏ = đã cảnh báo), ảnh các cảnh báo, tải CSV / báo cáo HTML. Tab **Lịch sử cảnh báo** lưu mọi lần chạy.
 
 ## 4. Đánh giá
 
@@ -70,6 +71,8 @@ Trên server miễn phí chỉ có CPU, tốc độ thấp (vài FPS); tăng t�
 
 ```
 app.py                 giao diện Streamlit
+components/zone_editor bộ kéo thả vùng cấm trên khung hình (HTML/JS thuần)
+src/ui.py              cầu nối Streamlit <-> bộ kéo thả
 evaluate.py            đánh giá mức sự kiện, so sánh N, FPS
 eval_detection.py      precision/recall phát hiện người
 src/processor.py       đọc video, YOLO + ByteTrack, vẽ chú thích, ghi video H.264
