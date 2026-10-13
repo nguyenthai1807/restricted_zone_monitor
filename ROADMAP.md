@@ -1,107 +1,147 @@
-# Lộ trình mở rộng: Hệ thống giám sát an ninh thông minh
+# ROADMAP — SchoolGuard AI
+## Giám sát an ninh khuôn viên trường học bằng Computer Vision
 
-## 1. Mục tiêu mới
-Mở rộng dự án từ phát hiện đối tượng trong vùng cấm thành hệ thống hỗ trợ giám sát an ninh theo ngữ cảnh:
-- Phát hiện người/xe đi vào khu vực bị hạn chế.
-- Cấu hình vùng, lịch được phép/cấm, độ trễ và mức độ cảnh báo.
-- Nghiên cứu phát hiện hành vi nguy hiểm như nghi ngờ ẩu đả hoặc té ngã/tai nạn.
-- Lưu sự kiện, ảnh minh chứng, thời gian, loại cảnh báo và trạng thái xử lý.
+**Mốc nộp/trình bày:** 28/10/2026  
+**Chiến lược:** hoàn thiện một MVP ổn định trước, nghiên cứu nhận diện sự cố sau. Đây là kế hoạch; mục nào chưa được triển khai và kiểm thử thì không được coi là chức năng đã hoàn thành.
 
-**Lưu ý quan trọng:** YOLO hiện tại nhận diện đối tượng như người/xe, không tự nhận biết đáng tin cậy hành vi đánh nhau hay tai nạn. Các tính năng hành vi cần mô hình phù hợp và dữ liệu kiểm thử riêng. Hệ thống chỉ hỗ trợ người trực giám sát; cảnh báo cần được con người xác minh.
+## 1. Phạm vi đã chốt
 
-## 2. Chức năng hiện có cần giữ
-- Giao diện Streamlit chọn/tải video.
-- Vẽ polygon vùng hạn chế và lưu cấu hình.
-- YOLO phát hiện đối tượng, ByteTrack theo dõi ID.
-- Quy tắc ở trong vùng quá N giây và cảnh báo tụ tập cơ bản.
+### Mục tiêu MVP (bắt buộc)
+Hỗ trợ nhân viên an ninh rà soát **video mẫu tải lên** để phát hiện người đi vào vùng hạn chế trong khung giờ không được phép, tạo cảnh báo có bằng chứng và lưu lịch sử.
+
+Kịch bản mẫu:
+- Cổng phụ hoặc hành lang chỉ dành cho nhân viên.
+- Sân thượng/khu vực kỹ thuật bị hạn chế.
+- Khuôn viên hoặc bãi xe sau giờ hoạt động.
+
+Không kết nối camera trực tiếp trong MVP; không nhận diện danh tính; không tự động kết luận một người có ý định xấu.
+
+### Giai đoạn 2 (chỉ làm khi MVP đạt mốc)
+Nghiên cứu **một** loại sự cố, ưu tiên thử nghiệm té ngã *hoặc* xô xát, bằng mô hình nhận diện hành động/chuỗi khung hình và tập video có nhãn. Kết quả chỉ là “sự cố nghi ngờ — cần xác minh”. Nếu chưa có dữ liệu/mô hình và kết quả đánh giá phù hợp, báo cáo phần này là nghiên cứu khả thi/hướng phát triển, không đưa vào danh sách tính năng đã hoàn thiện.
+
+### Ngoài phạm vi trước 28/10
+- Hệ thống đa camera hoặc giám sát RTSP 24/7.
+- Nhận diện khuôn mặt/định danh học sinh.
+- Gửi SMS/email/Telegram hoặc tích hợp hệ thống quản lý trường.
+- Nhiều hồ sơ môi trường (bệnh viện, kho hàng, v.v.).
+- Cam kết phát hiện đánh nhau/té ngã chính xác khi chưa đánh giá.
+
+## 2. Thành phần hiện có phải giữ
+
+- OpenCV đọc video.
+- YOLO (Ultralytics) phát hiện người/đối tượng mà mô hình hiện tại hỗ trợ.
+- ByteTrack theo dõi ID đối tượng.
+- Polygon zones và trình chỉnh sửa vùng.
+- Luật vùng cấm/thời gian lưu lại N giây hiện có.
+- Giao diện Streamlit tải/chọn video và hiển thị kết quả.
 - SQLite, ảnh sự kiện, lịch sử, xuất CSV/HTML.
-- Công cụ đánh giá sự kiện/FPS và kiểm thử pipeline.
+- `evaluate.py`, `eval_detection.py` và `tests/test_pipeline.py`.
 
-Không xóa các chức năng này. Bổ sung theo từng bước và giữ tương thích với cấu hình vùng cấm cũ nếu có thể.
+Không viết lại toàn bộ pipeline. Giữ khả năng đọc cấu hình vùng cũ (`data/zones.json`) hoặc cung cấp chuyển đổi có kiểm thử nếu định dạng thay đổi.
 
-## 3. Kịch bản và mức ưu tiên
+## 3. Yêu cầu MVP — P0
 
-### P0 — Cần hoàn thiện trước
-1. **Xâm nhập theo lịch:** mỗi khu vực có tên, polygon, đối tượng áp dụng, ngày trong tuần và giờ cấm. Ví dụ sân thượng cấm toàn thời gian; sân trường cấm từ 22:00 đến 05:00. Cho phép cấu hình báo ngay hoặc chờ vài giây để giảm báo nhầm. Phải xử lý đúng lịch qua nửa đêm.
-2. **Nhiều hồ sơ môi trường:** Trường học, Kho hàng, Sân thượng; mỗi hồ sơ có vùng, lịch, ngưỡng tin cậy, thời gian chờ và mức độ cảnh báo riêng.
-3. **Bảng cảnh báo:** loại sự kiện, camera/video, thời gian, khu vực, độ tin cậy, ảnh minh chứng và mức độ.
-4. **Xử lý sự kiện:** Mới / Đang xác minh / Đã xử lý / Báo nhầm; có ghi chú người xác minh.
-5. **Lọc và báo cáo:** lọc theo ngày, khu vực, loại, mức độ; xuất CSV/HTML; tránh tạo cảnh báo lặp bằng cơ chế cooldown.
-6. **Thông báo:** bản đầu tiên cảnh báo ngay trên giao diện và lưu lịch sử. Email/Telegram là phần mở rộng; bí mật API phải đặt trong biến môi trường, không commit lên GitHub.
+1. **Vùng hạn chế theo lịch:** tên vùng, polygon, ngày trong tuần, giờ cấm/cho phép và thời gian chờ trước cảnh báo.
+2. **Lịch qua nửa đêm:** ví dụ 22:00–05:00 phải hoạt động đúng ở cả hai phía của nửa đêm.
+3. **Cảnh báo xâm nhập:** ghi loại sự kiện, video, thời điểm, vùng, ảnh bằng chứng và thông tin đối tượng nếu có.
+4. **Chống cảnh báo trùng:** cooldown/khóa sự kiện theo track và vùng; tránh một người đứng trong vùng tạo cảnh báo ở mọi khung hình.
+5. **Bảng sự kiện:** xem ảnh, lọc theo ngày/vùng/loại, đánh dấu “Mới”, “Đang xác minh”, “Đã xử lý” hoặc “Báo nhầm”.
+6. **Lưu trữ và báo cáo:** SQLite vẫn hoạt động sau khi khởi động lại; xuất CSV/HTML.
+7. **Trải nghiệm demo:** trạng thái tải video, phân tích, hoàn thành và lỗi rõ ràng; demo có thể chạy hoàn toàn từ video tải lên.
+8. **Đánh giá:** dùng video có nhãn thật; tách video dùng chỉnh cấu hình và video kiểm thử cuối.
 
-### P1 — Nghiên cứu hành vi
-7. **Nghi ngờ ẩu đả/xung đột:** cần mô hình nhận diện hành động/video hoặc baseline phù hợp và dữ liệu gán nhãn. Phân biệt với thể thao, đùa giỡn, bắt tay, chen lấn. Chỉ hiển thị “nghi ngờ xung đột” kèm độ tin cậy để người trực xác minh.
-8. **Nghi ngờ té ngã/tai nạn:** cần pose estimation hoặc action recognition theo chuỗi khung hình. Không được kết luận tai nạn chỉ vì người ngồi/nằm hoặc một khung hình bất thường.
-9. Nếu chưa có mô hình và đánh giá phù hợp, trình bày hai tính năng trên là hướng phát triển, không tuyên bố đã hoàn thiện.
+## 4. Kế hoạch theo ngày và deadline
 
-### P2 — Ý tưởng mở rộng
-10. Tụ tập đông người ở nơi/giờ không phù hợp.
-11. Xe đi vào khu vực chỉ dành cho người đi bộ.
-12. Người lưu lại bất thường ngoài giờ cho phép.
-13. Lối thoát hiểm bị che chắn — cần luật/mô hình và góc camera phù hợp.
-14. Vật thể bị bỏ quên — cần định nghĩa khu vực và cách giảm báo nhầm.
-15. Nhiều camera hoặc camera IP/RTSP trực tiếp. Phiên bản hiện tại chủ yếu xử lý video đã chọn/tải lên, chưa phải hệ thống giám sát trực tiếp 24/7.
+| Ngày | Công việc | Đầu ra/tiêu chí chốt |
+|---|---|---|
+| 13–14/10 | Chạy baseline, chốt cấu trúc dữ liệu sự kiện/lịch, chuẩn bị video và test case, tạo GitHub Issues | Cả nhóm chạy được bản hiện tại; thống nhất hợp đồng dữ liệu và phạm vi |
+| 15–16/10 | Viết/test hàm lịch và luật vùng; làm giao diện vùng/lịch; chuẩn bị nhãn video | Có test giờ được phép, giờ cấm và lịch qua nửa đêm |
+| 17–18/10 | Tích hợp luật lịch vào pipeline và cảnh báo; dựng UI giám sát | Chạy được một video end-to-end, tạo sự kiện có timestamp |
+| 19–21/10 | Hoàn thiện SQLite, ảnh bằng chứng, trạng thái xác minh, lọc và xuất CSV/HTML | **MVP tích hợp ổn định chậm nhất 21/10** |
+| 22–24/10 | Kiểm thử độc lập, sửa lỗi; chỉ sau khi MVP đạt mới thử một mô hình sự cố | Báo cáo test và số liệu; mô hình sự cố là tùy chọn |
+| 25/10 | Đóng băng tính năng | Không thêm tính năng lớn; chỉ sửa lỗi |
+| 25–26/10 | Viết báo cáo, slide, hướng dẫn cài đặt, ghi giới hạn | Báo cáo có kiến trúc, phân công, dữ liệu, kết quả và hạn chế |
+| 27/10 | Tổng duyệt trên máy demo, chạy video dự phòng | Chạy trọn kịch bản ít nhất 2 lần, không thao tác sửa code tại chỗ |
+| 28/10 | Trình bày | Demo MVP, số liệu đánh giá và hướng phát triển |
 
-## 4. Danh sách công việc kỹ thuật
+## 5. Phân công 7 thành viên
 
-### Cấu hình và luật
-- [ ] Thiết kế data/security_profiles.json (hoặc cấu hình tương đương) lưu hồ sơ, vùng và lịch.
-- [ ] Viết hàm kiểm tra lịch cấm độc lập với giao diện.
-- [ ] Xử lý đúng lịch qua nửa đêm, ngày trong tuần, múi giờ và ngày ngoại lệ.
-- [ ] Giữ tương thích data/zones.json hoặc có bước chuyển đổi cấu hình cũ.
-- [ ] Kiểm tra polygon/giờ không hợp lệ.
-- [ ] Tách loại sự kiện, mức độ, độ trễ và cooldown.
-- [ ] Phân biệt rõ “phát hiện người”, “xâm nhập vùng cấm” và “nghi ngờ hành vi nguy hiểm”.
-- [ ] Đảm bảo vùng nguy cơ cao có thể báo ngay, không bị áp thời gian chờ mặc định.
+### Thành viên 1 — Frontend: màn hình video
+- Hoàn thiện chọn/tải video, nút chạy/dừng và trạng thái xử lý.
+- Hiển thị video chú thích, bounding box, ID và polygon.
+- **Deadline:** bản đầu 18/10; ổn định 21/10.
+- **Nghiệm thu:** chạy được video mẫu hợp lệ; báo lỗi dễ hiểu với file không hợp lệ.
 
-### Giao diện và lưu trữ
-- [ ] Trang quản lý khu vực, hồ sơ môi trường và lịch cấm.
-- [ ] Bảng sự kiện với bộ lọc, ảnh minh chứng và trạng thái xác minh.
-- [ ] Hiển thị rõ nguồn của cảnh báo: luật vùng hay mô hình hành vi.
-- [ ] Lưu loại sự kiện, mức độ, độ tin cậy, thời gian, ảnh và trạng thái xử lý.
-- [ ] Hiển thị lỗi dễ hiểu khi video, mô hình hoặc cấu hình không dùng được.
+### Thành viên 2 — Frontend: cấu hình vùng và lịch
+- Giao diện chọn vùng, tên vùng và cấu hình ngày/giờ cấm.
+- Làm rõ múi giờ dùng cho demo; không mở rộng ngày nghỉ/ngoại lệ nếu chưa cần.
+- **Deadline:** bản đầu 18/10; kiểm thử tích hợp 21/10.
+- **Nghiệm thu:** cấu hình được ít nhất 2 vùng với lịch khác nhau; dữ liệu hợp lệ được lưu và nạp lại.
 
-### Dữ liệu và đánh giá
-- [ ] Chuẩn bị video bình thường, xâm nhập ban ngày/ban đêm, đi sát mép vùng, tụ tập và tình huống dễ nhầm.
-- [ ] Gán nhãn khoảng thời gian có sự kiện làm ground truth.
-- [ ] Tách tập chỉnh ngưỡng và tập kiểm thử cuối.
-- [ ] Báo cáo precision, recall, F1, cảnh báo sai mỗi giờ, độ trễ cảnh báo và FPS.
-- [ ] Với mô hình ẩu đả/té ngã, cần bộ dữ liệu và chỉ số riêng.
-- [ ] Không dùng video chưa có quyền sử dụng; hạn chế dữ liệu nhận diện cá nhân và thời hạn lưu.
+### Thành viên 3 — Frontend: cảnh báo và lịch sử
+- Bảng sự kiện, ảnh bằng chứng, bộ lọc và trạng thái xác minh.
+- Nút xuất CSV/HTML hoặc nối với chức năng xuất hiện có.
+- **Deadline:** bản đầu 19/10; tích hợp 21/10.
+- **Nghiệm thu:** xem được chi tiết một sự kiện, lọc lịch sử và thay đổi trạng thái.
 
-### Kiểm thử tối thiểu
-- [ ] Vào vùng cấm trong giờ cấm → cảnh báo đúng độ trễ.
-- [ ] Vào vùng trong giờ được phép → không có cảnh báo xâm nhập.
-- [ ] Lịch 22:00–05:00 hoạt động đúng trước và sau nửa đêm.
-- [ ] Đi sát mép vùng không gây quá nhiều báo nhầm.
-- [ ] Mất tracking rồi xuất hiện lại không tạo hàng loạt cảnh báo.
-- [ ] Sự kiện lưu đúng vào SQLite và xuất CSV/HTML.
-- [ ] Cấu hình cũ vẫn đọc được hoặc chuyển đổi an toàn.
-- [ ] Cảnh báo hành vi không chắc chắn được hiển thị là “nghi ngờ”, không phải kết luận.
+### Thành viên 4 — Backend: pipeline video
+- Giữ OpenCV + YOLO + ByteTrack; đảm bảo video tải lên được xử lý và vùng hiển thị đúng.
+- Kiểm tra lỗi codec/video và luồng dừng/chạy.
+- **Deadline:** kiểm tra baseline 14/10; tích hợp 18/10; ổn định 21/10.
+- **Nghiệm thu:** không làm hỏng pipeline cũ; ID và timestamp được truyền đúng cho luật cảnh báo.
 
-## 5. Thứ tự triển khai
-1. Chốt cấu trúc hồ sơ/khu vực/lịch và viết test lịch.
-2. Thêm luật xâm nhập theo lịch, giữ pipeline YOLO + ByteTrack.
-3. Nâng cấp bảng cảnh báo và trạng thái xác minh.
-4. Chuẩn bị video test, đo precision/recall, báo nhầm mỗi giờ và độ trễ.
-5. Khi P0 ổn định, thử nghiệm mô hình xung đột/té ngã.
-6. Sau cùng mới xét camera trực tiếp, thông báo ngoài ứng dụng và nhiều camera.
+### Thành viên 5 — Backend: luật lịch và lưu trữ
+- Viết hàm kiểm tra lịch cấm độc lập với UI; xử lý lịch qua nửa đêm.
+- Tích hợp cooldown/chống trùng, SQLite, ảnh và báo cáo.
+- **Deadline:** logic lịch 16/10; tích hợp 20/10; hoàn thiện 21/10.
+- **Nghiệm thu:** test giờ cấm/cho phép và qua nửa đêm đạt; sự kiện lưu đúng và tồn tại sau khi khởi động lại.
 
-## 6. Phân chia nhóm 7 người
-1. **Frontend 1:** giao diện giám sát, chọn video, tiến trình xử lý.
-2. **Frontend 2:** cấu hình khu vực, hồ sơ môi trường, lịch cấm.
-3. **Frontend 3:** bảng sự kiện, bộ lọc, xác minh, báo cáo.
-4. **Backend 1:** pipeline video, YOLO/ByteTrack, ảnh sự kiện, độ trễ.
-5. **Backend 2:** luật lịch, mức cảnh báo, cooldown, cấu hình và SQLite.
-6. **Tester 1:** kiểm thử chức năng, lịch qua nửa đêm, tương thích cấu hình, xuất báo cáo.
-7. **Tester 2:** ground truth, precision/recall/F1, báo nhầm mỗi giờ, FPS và nghiên cứu dữ liệu hành vi.
+### Thành viên 6 — Tester: kiểm thử chức năng/hồi quy
+- Viết checklist, kiểm thử file lỗi, polygon/lịch không hợp lệ, cooldown, SQLite và CSV/HTML.
+- Chạy lại `tests/test_pipeline.py` sau các lần tích hợp.
+- **Deadline:** test case 15/10; vòng test MVP 21–22/10; kiểm thử cuối 24/10.
+- **Nghiệm thu:** có báo cáo từng test đạt/không đạt, bước tái hiện và mức độ lỗi.
 
-Chốt hợp đồng giao tiếp giữa frontend/backend trước khi chia nhánh; tránh để nhiều người cùng sửa app.py mà không thống nhất.
+### Thành viên 7 — Tester: dữ liệu và đánh giá
+- Chuẩn bị video bình thường/xâm nhập và ground truth theo khoảng thời gian.
+- Tách video chỉnh cấu hình khỏi tập test cuối; đo precision, recall, cảnh báo sai/giờ và FPS.
+- **Deadline:** bộ video nháp 16/10; ground truth 20/10; kết quả 24/10.
+- **Nghiệm thu:** có bảng số liệu, mô tả cách tính và nêu rõ giới hạn của video mẫu; không sửa ngưỡng dựa trên tập test cuối.
 
-## 7. Tiêu chí hoàn thành bản báo cáo
-- [ ] Demo ít nhất 2 kịch bản: xâm nhập theo lịch và không cảnh báo khi được phép.
-- [ ] Cấu hình được ít nhất 2 môi trường.
-- [ ] Cảnh báo có ảnh, thời gian, loại sự kiện và lưu lịch sử.
-- [ ] Có kết quả kiểm thử định lượng, ví dụ báo nhầm và giới hạn.
-- [ ] Nêu rõ ẩu đả/té ngã là hướng nghiên cứu nếu chưa có mô hình và đánh giá đủ tin cậy.
-- [ ] README hướng dẫn cài đặt, demo, chuẩn bị dữ liệu và giới hạn.
+**Phối hợp:** một thành viên được nhóm chỉ định làm người tích hợp/merge; đây là vai trò điều phối, không phải thành viên thứ tám. Frontend/backend thống nhất tên trường và kiểu dữ liệu sự kiện trước 15/10. Mỗi PR phải mô tả thay đổi và cách test; tránh nhiều người cùng sửa `app.py` mà không báo nhau.
+
+## 6. Tiêu chí nghiệm thu toàn dự án
+
+### Chức năng bắt buộc
+- [ ] Demo được ít nhất 2 kịch bản: người xâm nhập trong giờ cấm → có cảnh báo; người đi vào trong giờ cho phép → không có cảnh báo xâm nhập theo lịch.
+- [ ] Có ít nhất 2 vùng cấu hình khác nhau.
+- [ ] Lịch qua nửa đêm được kiểm thử.
+- [ ] Cảnh báo có thời gian, vùng và ảnh bằng chứng.
+- [ ] Chống lặp cảnh báo cho cùng một lần xâm nhập.
+- [ ] SQLite lưu được lịch sử sau khi khởi động lại.
+- [ ] Lọc sự kiện và xuất CSV/HTML hoạt động.
+- [ ] Các bài test hồi quy hiện có vẫn đạt.
+- [ ] Demo từ video tải lên, không phụ thuộc camera trực tiếp.
+
+### Đánh giá định lượng
+Mục tiêu khởi đầu (không phải kết quả đã đạt): precision cảnh báo xâm nhập ≥ 90%, recall ≥ 85%, độ trễ ≤ 2 giây sau khi hệ thống đủ điều kiện phát cảnh báo trong môi trường demo đã xác định. Nếu không đạt, báo cáo số liệu thật và phân tích nguyên nhân; không thay đổi nhãn để làm đẹp kết quả.
+
+### An toàn, quyền riêng tư và tính trung thực
+- [ ] Dùng video tự tạo hoặc có quyền sử dụng; tránh dữ liệu học sinh có thể nhận dạng nếu không có cho phép.
+- [ ] Không nhận diện khuôn mặt hoặc khẳng định danh tính.
+- [ ] Cảnh báo là hỗ trợ xác minh của con người, không phải kết luận vi phạm.
+- [ ] Té ngã/xô xát chỉ được ghi là tính năng thử nghiệm nếu có mô hình và đánh giá riêng; nếu chưa, để ở mục hướng phát triển.
+
+## 7. Kịch bản demo chuẩn
+
+1. Mở ứng dụng và tải video mẫu.
+2. Chọn vùng hạn chế và cấu hình giờ cấm.
+3. Chạy phân tích, quan sát box/ID/vùng.
+4. Chỉ ra thời điểm xâm nhập và cảnh báo kèm ảnh bằng chứng.
+5. Mở lịch sử, xác minh sự kiện, xuất CSV/HTML.
+6. Chạy video đối chứng trong giờ cho phép để chứng minh hệ thống không cảnh báo sai theo lịch.
+7. Kết thúc bằng số liệu test và các giới hạn đã biết.
+
+## 8. Giới hạn phải nêu trong báo cáo
+
+Video mẫu không đại diện đầy đủ cho camera trường học thực tế. Ánh sáng, góc camera, che khuất và đổi ID tracking có thể ảnh hưởng kết quả. Polygon là vùng 2D trên ảnh. Hệ thống chưa được chứng nhận để triển khai an ninh thực tế và mọi cảnh báo cần người có trách nhiệm xác minh.
