@@ -1,90 +1,69 @@
-# Giám sát khu vực hạn chế bằng Computer Vision
+# SchoolGuard AI — Giám sát an ninh khuôn viên trường học
 
-Pipeline: **OpenCV** đọc video → **YOLO (Ultralytics)** nhận diện người/xe → **ByteTrack** gán ID liên tục → **luật vùng cấm** (polygon + ở lại liên tục N giây) → lưu cảnh báo vào **SQLite** (+ ảnh) → giao diện **Streamlit**.
+Dự án thị giác máy tính hỗ trợ rà soát **video mẫu tải lên** để phát hiện người đi vào vùng hạn chế trong thời gian không được phép. Mục tiêu của bản MVP là tạo cảnh báo có bằng chứng và lưu lịch sử sự kiện; không thay thế nhân sự an ninh.
 
-> Hệ thống chỉ hỗ trợ cảnh báo, không thay thế nhân sự an ninh.
+> **Phạm vi:** ưu tiên khuôn viên trường học. Lộ trình, phân công 7 thành viên, deadline và tiêu chí nghiệm thu xem tại [ROADMAP.md](ROADMAP.md). Những tính năng chưa được triển khai và kiểm thử không được xem là đã hoàn thiện.
+
+## Pipeline hiện có
+
+**OpenCV** đọc video → **YOLO (Ultralytics)** phát hiện người/đối tượng mô hình hỗ trợ → **ByteTrack** gán ID → **polygon zones + luật vùng/thời gian lưu lại** → **SQLite + ảnh sự kiện** → giao diện **Streamlit**, lịch sử và xuất CSV/HTML.
+
+Kế hoạch mở rộng theo thứ tự:
+1. Xâm nhập vùng hạn chế theo lịch — chức năng chính cần hoàn thiện.
+2. Cảnh báo, xác minh, lịch sử và đánh giá bằng video có nhãn.
+3. Nghiên cứu một loại sự cố (té ngã hoặc xô xát) chỉ khi MVP ổn định và có mô hình/dữ liệu phù hợp.
+
+YOLO phát hiện người không tự động có nghĩa là hệ thống nhận diện được té ngã hay xô xát. Những hành vi đó cần mô hình và đánh giá riêng; nếu chưa đủ bằng chứng, chỉ ghi là hướng phát triển.
 
 ## 1. Cài đặt và chạy
 
 ```bash
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
-Lần đầu chạy, Ultralytics tự tải trọng số `yolov8n.pt`. Có GPU NVIDIA thì cài PyTorch bản CUDA để nhanh hơn.
 
-Kiểm tra logic không cần YOLO: `python tests/test_pipeline.py` (hoặc `pytest`).
+Lần đầu chạy, Ultralytics có thể tự tải trọng số `yolov8n.pt`. Kiểm tra logic không cần YOLO bằng `python tests/test_pipeline.py` (hoặc `pytest`).
 
-## 2. Tình huống demo và chuẩn bị video
+## 2. Demo video
 
-Tình huống: camera cổng trường / bãi xe / kho hàng; cảnh báo khi người đi vào vùng cấm quá N giây.
+Dùng video tự tạo hoặc video có quyền sử dụng. Không đưa video học sinh có thể nhận dạng hoặc thông tin nhạy cảm lên kho công khai nếu chưa có quyền phù hợp.
 
-```bash
-pip install yt-dlp
-yt-dlp -f "mp4[height<=720]" -o "data/raw/%(id)s.%(ext)s" "<URL video giám sát công khai>"
-# cắt đoạn 10s -> 40s
-ffmpeg -ss 10 -i data/raw/abc.mp4 -t 30 -c copy data/normal/abc_normal.mp4
-```
-Kiểm tra giấy phép/điều khoản của video trước khi dùng. Chia thư mục:
+1. Chọn/tải video trong giao diện.
+2. Đặt polygon vùng hạn chế và lưu cấu hình.
+3. Cấu hình thời gian cấm khi tính năng lịch được tích hợp.
+4. Chạy phân tích, xem cảnh báo và ảnh bằng chứng.
+5. Kiểm tra lịch sử, rồi xuất CSV/HTML.
 
-| Thư mục | Nội dung |
-|---|---|
-| `data/normal/` | người di chuyển hợp lệ, không vào vùng cấm |
-| `data/event/` | người bước vào vùng cấm, đỗ xe bất thường, tụ tập |
-| `data/test/` | video **riêng để kiểm thử**, không dùng để chỉnh ngưỡng/vùng/N |
+Cấu trúc dữ liệu đánh giá khuyến nghị:
+- `data/normal/`: video không có xâm nhập.
+- `data/event/`: video có xâm nhập.
+- `data/test/`: video kiểm thử cuối, không dùng để chỉnh ngưỡng.
+- `data/ground_truth.csv`: khoảng thời gian sự kiện thật, theo định dạng được mô tả trong `ROADMAP.md` và `evaluate.py`.
 
-Chỉnh `conf`, vùng cấm và N chỉ trên `normal/` + `event/`; chốt cấu hình rồi mới chạy đánh giá trên `test/`.
+## 3. Đánh giá
 
-## 3. Dùng giao diện
+Các script hiện có gồm `evaluate.py`, `eval_detection.py` và `tests/test_pipeline.py`. Báo cáo nên nêu precision, recall, cảnh báo sai mỗi giờ, FPS, độ trễ và điều kiện chạy. Không coi các mục tiêu trong roadmap là kết quả đã đo được.
 
-1. **Chọn video**: từ thư mục `data/` hoặc tải lên.
-2. **Kéo để đặt vùng cấm** ngay trên khung hình (dùng thanh trượt để xem khung hình khác):
-   - kéo **chấm tròn** để đổi hình dạng, kéo **bên trong vùng** để dời cả vùng;
-   - nhấp đúp lên **cạnh** để thêm điểm, nhấp đúp lên **chấm** để xoá (hoặc dùng nút ＋ / － / ↺);
-   - bấm **Lưu vùng này cho video** để ghi vào `data/zones.json`, `evaluate.py` sẽ dùng lại.
-3. Chỉnh nhanh ở thanh bên: đối tượng cần cảnh báo, số giây chờ, độ nhạy (mục nâng cao: mô hình, tốc độ, điểm kiểm tra).
-4. Bấm **Chạy phân tích** → xem video chú thích (xanh = bình thường, cam = trong vùng, đỏ = đã cảnh báo), ảnh các cảnh báo, tải CSV / báo cáo HTML. Tab **Lịch sử cảnh báo** lưu mọi lần chạy.
-
-## 4. Đánh giá
-
-```bash
-# a) Mức sự kiện + so sánh N + FPS
-python evaluate.py --videos data/test --zones data/zones.json --gt data/ground_truth.csv --dwell 0 2 3
-# b) Precision/Recall phát hiện người (cần ~100-200 khung tự gán nhãn dạng YOLO)
-python eval_detection.py --data data/person.yaml --model yolov8n.pt
-```
-- `data/zones.json`: vùng cấm chuẩn hoá (0–1) cho từng video, khoá `default` dùng chung.
-- `data/ground_truth.csv`: `video,start_s,end_s` – khoảng thời gian có sự kiện thật. Video bình thường không cần dòng nào.
-- Cảnh báo được tính **đúng** nếu rơi vào khoảng sự kiện ± `--tolerance` giây (mặc định 2s).
-- Kết quả: precision, recall, số cảnh báo sai mỗi giờ, FPS, ghi vào `outputs/eval_results.csv`. `N=0` là mốc "trước khi có cơ chế N giây".
-
-## 5. Đưa lên web
-
-Streamlit cần máy chủ Python nên không chạy được như trang HTML tĩnh. Cách đơn giản nhất:
-
-- **Hugging Face Spaces** (khuyên dùng – RAM 16 GB miễn phí): New Space → SDK *Streamlit* → tải toàn bộ thư mục này lên (có sẵn `requirements.txt`, `packages.txt`).
-- **Streamlit Community Cloud**: đẩy lên GitHub → share.streamlit.io → chọn `app.py`. Bộ nhớ ít hơn, nên dùng `yolov8n.pt` và video ngắn.
-
-Trên server miễn phí chỉ có CPU, tốc độ thấp (vài FPS); tăng tốc bằng "xử lý 1/N khung" và `imgsz` nhỏ.
-
-## 6. Cấu trúc
+## 4. Thành phần chính
 
 ```
-app.py                 giao diện Streamlit
-components/zone_editor bộ kéo thả vùng cấm trên khung hình (HTML/JS thuần)
-src/ui.py              cầu nối Streamlit <-> bộ kéo thả
-evaluate.py            đánh giá mức sự kiện, so sánh N, FPS
-eval_detection.py      precision/recall phát hiện người
-src/processor.py       đọc video, YOLO + ByteTrack, vẽ chú thích, ghi video H.264
-src/rules.py           vùng cấm, dwell time, cảnh báo tụ tập, phát lại luật
-src/storage.py         SQLite, ảnh sự kiện, CSV, báo cáo HTML
-tests/test_pipeline.py kiểm thử bằng YOLO giả lập
+app.py                  giao diện Streamlit
+components/zone_editor  chỉnh sửa polygon vùng hạn chế
+src/ui.py               cầu nối Streamlit và zone editor
+src/processor.py        video, YOLO + ByteTrack, vẽ chú thích
+src/rules.py            luật vùng, dwell time và cảnh báo
+src/storage.py          SQLite, ảnh sự kiện, CSV/HTML
+evaluate.py             đánh giá sự kiện/FPS
+eval_detection.py       đánh giá phát hiện đối tượng
+tests/test_pipeline.py  kiểm thử pipeline
+ROADMAP.md              phạm vi, deadline, phân công và nghiệm thu
 ```
 
-## 7. Giới hạn cần nêu trong báo cáo
+## 5. Giới hạn và quyền riêng tư
 
-- Video mạng khác góc camera, độ cao, ánh sáng và độ phân giải của camera thực tế → kết quả không đại diện triển khai thật.
-- Bị che khuất, đông người, ban đêm/mưa làm giảm độ chính xác; ID tracking có thể đổi khi mất dấu lâu.
-- Vùng cấm là polygon 2D trên ảnh; camera nghiêng làm "tâm bbox trong vùng" không luôn đồng nghĩa người đứng trong vùng.
-- Chưa nhận diện danh tính; dùng camera thật cần tuân thủ quy định về quyền riêng tư và biển báo giám sát.
-- Là công cụ hỗ trợ: mọi cảnh báo cần nhân sự an ninh xác nhận.
+- Video mẫu không đại diện hoàn toàn cho camera thật; ánh sáng, góc quay, che khuất và tracking có thể ảnh hưởng kết quả.
+- Polygon là vùng 2D trên ảnh, không phải hiểu biết đầy đủ về không gian.
+- MVP không nhận diện danh tính và không giám sát camera trực tiếp 24/7.
+- Chỉ dùng video có quyền sử dụng; giảm thiểu dữ liệu nhận dạng và thời gian lưu.
+- Hệ thống chỉ hỗ trợ người trực; mọi cảnh báo cần được con người xác minh.
