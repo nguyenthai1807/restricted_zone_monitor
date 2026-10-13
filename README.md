@@ -1,6 +1,8 @@
-# Giám sát khu vực hạn chế bằng Computer Vision
+# Giám sát an ninh thông minh bằng Computer Vision
 
-Pipeline: **OpenCV** đọc video → **YOLO (Ultralytics)** nhận diện người/xe → **ByteTrack** gán ID liên tục → **luật vùng cấm** (polygon + ở lại liên tục N giây) → lưu cảnh báo vào **SQLite** (+ ảnh) → giao diện **Streamlit**.
+> **Lộ trình mở rộng:** xem [ROADMAP.md](ROADMAP.md) để biết các công việc bổ sung về xâm nhập theo lịch, hồ sơ môi trường, xử lý cảnh báo, đánh giá và nghiên cứu phát hiện xung đột/té ngã. Đây là kế hoạch phát triển; các chức năng chưa được triển khai và kiểm thử không được xem là đã hoàn thiện.
+
+Pipeline hiện tại: **OpenCV** đọc video → **YOLO (Ultralytics)** nhận diện người/xe → **ByteTrack** gán ID liên tục → **luật vùng cấm** (polygon + ở lại liên tục N giây) → lưu cảnh báo vào **SQLite** (+ ảnh) → giao diện **Streamlit**. Mục tiêu tiếp theo là bổ sung lịch cấm theo từng khu vực và phân loại sự kiện; phát hiện ẩu đả/té ngã cần mô hình hành vi riêng.
 
 > Hệ thống chỉ hỗ trợ cảnh báo, không thay thế nhân sự an ninh.
 
